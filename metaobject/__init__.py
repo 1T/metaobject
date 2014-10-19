@@ -23,7 +23,7 @@ def parse_commit(repopath):
     try:
         import subprocess
         git_cmd = "git log -n1 --decorate 2> /dev/null | tr '(,)' ';;;'"
-        commit = subprocess.check_output(git_cmd, shell=True)
+        commit = str(subprocess.check_output(git_cmd, shell=True))
     except (AttributeError, subprocess.CalledProcessError):
         commit = ''
     os.chdir(OLDPWD)
