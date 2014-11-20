@@ -14,7 +14,7 @@ from __future__ import absolute_import
 import json
 import logging
 import collections
-from datetime import datetime
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -22,31 +22,36 @@ def object_to_json(obj, dict_class=dict):
     if obj is None:
         return None
 
-    if isinstance(obj, collections.Mapping):
+    if isinstance(obj, (bool, bytes, str, unicode, int, long, float)):
         return obj
+
+    if isinstance(obj, (list, tuple)):
+        return map(lambda x: object_to_json(x, dict_class=dict_class), obj)
+
+    if isinstance(obj, (dict, dict_class)):
+        return dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in obj.items()])
 
     if isinstance(obj, datetime):
         return obj.isoformat()
 
-    if isinstance(obj, MetaObject):
-        d = dict_class()
-        for k, v in obj.items():
-            if isinstance(v, MetaObject):
-                v = object_to_json(v, dict_class=dict_class)
-            elif isinstance(v, list):
-                v = map(lambda x: object_to_json(x, dict_class=dict_class), v)
-            d[k] = v
-        return d
+    if isinstance(obj, timedelta):
+        return obj.total_seconds()
 
     if hasattr(obj, 'to_json') and obj.to_json:
         try:
             rep = obj.to_json(dict_class=dict_class)
-        except:
+        except TypeError:
             rep = obj.to_json()
         return rep
 
+    if hasattr(obj, '__getstate__'):
+        return object_to_json(obj.__getstate__())
+
+    if hasattr(obj, '__dict__'):
+        return object_to_json(vars(obj))
+
     logger.error("Unknown error serializing %s %s" % (type(obj), repr(obj).encode('ascii', 'ignore')))
-    raise ValueError("object_to_json could not serialize object")
+    return "ERROR(" + str(obj) + ")"
 
 class MetaObject(object):
 
@@ -242,7 +247,7 @@ class MetaObject(object):
     }
 
     def to_json(self, dict_class=dict):
-        return object_to_json(self, dict_class=dict_class)
+        return object_to_json(dict_class(obj.items()), dict_class=dict_class)
 
     def dumps(self):
         import json
