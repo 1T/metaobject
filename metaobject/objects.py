@@ -14,7 +14,7 @@ from __future__ import absolute_import
 import json
 import logging
 import collections
-from datetime import datetime
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -22,32 +22,37 @@ def object_to_json(obj, dict_class=dict):
     if obj is None:
         return None
 
-    if isinstance(obj, collections.Mapping):
+    if isinstance(obj, (bool, bytes, str, unicode, int, long, float)):
         return obj
+
+    if isinstance(obj, (list, tuple)):
+        return map(lambda x: object_to_json(x, dict_class=dict_class), obj)
+
+    if isinstance(obj, (dict, dict_class)):
+        return dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in obj.items()])
 
     if isinstance(obj, datetime):
         return obj.isoformat()
 
-    if isinstance(obj, MetaObject):
-        d = dict_class()
-        for k, v in obj.items():
-            if isinstance(v, MetaObject):
-                v = object_to_json(v, dict_class=dict_class)
-            elif isinstance(v, list):
-                v = map(lambda x: object_to_json(x, dict_class=dict_class), v)
-            d[k] = v
-        return d
+    if isinstance(obj, timedelta):
+        return obj.total_seconds()
 
     if hasattr(obj, 'to_json') and obj.to_json:
         try:
             rep = obj.to_json(dict_class=dict_class)
-        except:
+        except TypeError:
             rep = obj.to_json()
         return rep
 
+    if hasattr(obj, '__getstate__'):
+        return object_to_json(obj.__getstate__())
+
+    if hasattr(obj, '__dict__'):
+        return object_to_json(vars(obj))
+
     obj_repr = repr(obj).encode('ascii', 'ignore')
     logger.error("Unknown error serializing %s" % obj_repr)
-    return '<SERIALIZATION-ERROR/> ' + obj_repr
+    return "ERROR(" + str(obj) + ")"
 
 class MetaObject(object):
 
@@ -59,8 +64,6 @@ class MetaObject(object):
 
     _printed = ()       # a list of attributes to be used for debugging, defaults to _required
                         # any attribute name starting with an underscore is omitted.
-
-    _unlisted = None    # what do we do with an unlisted attribute: None, 'del', 'raise'
 
     _types = {}         # a dictionary of types, each attribute defaults to object.
                         # Any value given in kwargs will be converted to the given type
@@ -78,16 +81,22 @@ class MetaObject(object):
                         #    will set self.age = int(kwargs["age"])
                         #
 
+    _unlisted_action = None # what do we do with an unlisted attribute: None, 'del', 'raise'
+
+    _integers = ()      # a list of attributes that are int type
+
+    _mask = ()          # a list of attributes to be removed from _listed during output
+
     def __init__(self, obj=None):
-        if isinstance(obj, dict):
+        if obj == None:
+            # default constructor
+            kwargs = self._optional
+        elif isinstance(obj, dict):
             # dict constructor
             kwargs = dict(obj)
         elif hasattr(obj, '__dict__'):
             # copy constructor
             kwargs = dict(vars(obj))
-        elif obj == None:
-            # default constructor
-            kwargs = self._optional
         else:
             logger.error("MetaObject.__init__(%s)" % (repr(obj)))
             raise TypeError("expected dict or object: %s %s" % (type(obj), repr(obj)))
@@ -101,16 +110,21 @@ class MetaObject(object):
                 raise AttributeError("missing attribute: %s from %s" % (attr, obj))
 
         # handle any attributes given that are neither required or optional
-        if self._unlisted:
+        if self._unlisted_action:
             for attr in kwargs.keys():
                 if not attr in self._listed:
-                    if self._unlisted == 'del':
+                    if self._unlisted_action == 'del':
                         del kwargs[attr]
-                    elif self._unlisted == 'raise':
+                    elif self._unlisted_action == 'raise':
                         raise AttributeError("unlisted attribute: %s" % attr)
 
         self.__dict__.update(self._optional)
         self.__dict__.update(kwargs)    # specific attributes override optional values
+
+        # ensure that all int attributes are in _types
+        if len(self._integers):
+            for attr in self._integers:
+                self._types[attr] = int
 
         # ensure that all typed attributes are created
         for attr, cls in self._types.items():
@@ -118,9 +132,24 @@ class MetaObject(object):
             typed_value = self._instantiate(cls, attr, value)
             setattr(self, attr, typed_value)
 
-        self._reserved = ['_reserved', '_required', '_optional', '_listed', '_changed', '_compared', '_types', '_unlisted', '_printed']
+        self._reserved = [
+            '_reserved', 
+            '_changed', 
+            '_compared', 
+            '_integers', 
+            '_listed', 
+            '_mask', 
+            '_optional', 
+            '_printed',
+            '_required', 
+            '_types', 
+            '_unlisted_action']
+
         self._compared = self._compared or self._required
         self._printed = self._printed or self._required
+
+        if len(self._mask):
+            self._printed = filter(lambda x: x not in self._mask, self._printed)
 
         return
 
@@ -153,26 +182,35 @@ class MetaObject(object):
     #def __iter__(self, obj=None):
     #    return iter(self._listed)
 
-    #def __dict__(self):
-    #    return
-
     def __eq__(self, other):
         if type(self) != type(other):
             return False
 
         return dict(self._compared_items()) == dict(other._compared_items())
 
-    #def __ne__(self, other):
-    #    return not self.__eq__(other)
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
+    # backward compatibility
+    def isDifferent(self, other):
+        return self.__ne__(other)
+
+    # backward compatibility
+    def cleanOptionals(self):
+        #for all optionals that have a non-value assign default
+        for (attribute,default) in self._optional.items():
+            if not self.__dict__[attribute]:
+                self.__dict__[attribute] = default
+        return
+        
     def _equiv():
         if type(self) != type(other):
             return False
 
         return dict(self._listed_items()) == dict(other._listed_items())
 
-    #def _not_equiv():
-    #    return not self.equiv(other)
+    def _not_equiv():
+        return not self.equiv(other)
 
     def __repr__(self):
         d = dict(self.__dict__.items())
@@ -237,6 +275,8 @@ class MetaObject(object):
         addfields = set(self._optional.keys() + self._types.keys())
         addfields -= set(self._required)
         listed += list(addfields)
+        if len(self._mask):
+            listed = filter(lambda x: x not in self._mask, listed)
         return listed
 
     # The following methods are for use with JSON
@@ -248,9 +288,9 @@ class MetaObject(object):
 
     def to_json(self, dict_class=dict):
         try:
-            rep = object_to_json(self, dict_class=dict_class)
+            rep = object_to_json(dict_class(self.items()), dict_class=dict_class)
         except:
-            rep = object_to_json(self)
+            rep = object_to_json(dict_class(self.items()))
         return rep
 
     def dumps(self, dict_class=dict, default=object_to_json):
