@@ -45,8 +45,9 @@ def object_to_json(obj, dict_class=dict):
             rep = obj.to_json()
         return rep
 
-    logger.error("Unknown error serializing %s %s" % (type(obj), repr(obj).encode('ascii', 'ignore')))
-    raise ValueError("object_to_json could not serialize object")
+    obj_repr = repr(obj).encode('ascii', 'ignore')
+    logger.error("Unknown error serializing %s" % obj_repr)
+    return '<SERIALIZATION-ERROR/> ' + obj_repr
 
 class MetaObject(object):
 
@@ -88,7 +89,8 @@ class MetaObject(object):
             # default constructor
             kwargs = self._optional
         else:
-            raise TypeError("expected dict or object: %r" % type(obj))
+            logger.error("MetaObject.__init__(%s)" % (repr(obj)))
+            raise TypeError("expected dict or object: %s %s" % (type(obj), repr(obj)))
 
         # make sure that all keys are binary strings
         kwargs = self._ununicode(kwargs)
@@ -140,9 +142,12 @@ class MetaObject(object):
                 typed_value = map(cls[0], value) if value is not None else [] # create a list of cls objects
             else:
                 typed_value = cls(value) if value is not None else cls() # create a cls object
-        except:
-            logger.error("MetaObject._instantiate(%s, %s, %s)" % (repr(cls), repr(attr), repr(value)))
-            raise
+        except ValueError as err:
+            logger.error("MetaObject._instantiate(%s, %s, %s) %s" % (repr(cls), repr(attr), repr(value), repr(err)))
+            typed_value = cls(None)
+        except Exception as err:
+            logger.error("MetaObject._instantiate(%s, %s, %s) %s" % (repr(cls), repr(attr), repr(value), repr(err)))
+            typed_value = None
         return typed_value
 
     #def __iter__(self, obj=None):
@@ -242,15 +247,22 @@ class MetaObject(object):
     }
 
     def to_json(self, dict_class=dict):
-        return object_to_json(self, dict_class=dict_class)
+        try:
+            rep = object_to_json(self, dict_class=dict_class)
+        except:
+            rep = object_to_json(self)
+        return rep
 
-    def dumps(self):
-        import json
-        return json.dumps(self.to_json(), default=object_to_json, **self._json_kw)
+    def dumps(self, dict_class=dict, default=object_to_json):
+        try:
+            rep = self.to_json(dict_class=dict_class)
+        except:
+            rep = self.to_json()
+        return json.dumps(rep, default=default, **self._json_kw)
 
-    def dump(self, f):
+    def dump(self, f, default=object_to_json):
         import json
-        json.dump(self.to_json(), f, default=object_to_json, **self._json_kw)
+        json.dump(self.to_json(), f, default=default, **self._json_kw)
         return
 
     @classmethod
