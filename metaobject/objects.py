@@ -3,7 +3,7 @@
 #
 # metaobject
 # Copyright (c) 2014, Andrew Robbins, All rights reserved.
-# 
+#
 # This library ("it") is free software; it is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; you can redistribute it and/or modify it under the terms of the
 # GNU Lesser General Public License ("LGPLv3") <https://www.gnu.org/licenses/lgpl.html>.
@@ -68,7 +68,7 @@ class MetaObject(object):
     _types = {}         # a dictionary of types, each attribute defaults to object.
                         # Any value given in kwargs will be converted to the given type
                         # and then will be assigned to the attribute on the instance.
-                        # Any attribute may also be a list type, denoted `[<type>]`, 
+                        # Any attribute may also be a list type, denoted `[<type>]`,
                         # which indicates that the value must be given as a list as well.
                         #
                         # For example: attribute "names": [models.Name],
@@ -76,7 +76,7 @@ class MetaObject(object):
                         #
                         # For example: attribute "customer": models.Customer,
                         #    will set self.customer = models.Customer(kwargs["customer"])
-                        # 
+                        #
                         # For example: attribute "age": int,
                         #    will set self.age = int(kwargs["age"])
                         #
@@ -128,21 +128,24 @@ class MetaObject(object):
 
         # ensure that all typed attributes are created
         for attr, cls in self._types.items():
-            value = getattr(self, attr)
-            typed_value = self._instantiate(cls, attr, value)
+            try:
+                value = getattr(self, attr)
+                typed_value = self._instantiate(cls, attr, value)
+            except:
+                typed_value = None
             setattr(self, attr, typed_value)
 
         self._reserved = [
-            '_reserved', 
-            '_changed', 
-            '_compared', 
-            '_integers', 
-            '_listed', 
-            '_mask', 
-            '_optional', 
+            '_reserved',
+            '_changed',
+            '_compared',
+            '_integers',
+            '_listed',
+            '_mask',
+            '_optional',
             '_printed',
-            '_required', 
-            '_types', 
+            '_required',
+            '_types',
             '_unlisted_action']
 
         self._compared = self._compared or self._required
@@ -202,7 +205,7 @@ class MetaObject(object):
             if not self.__dict__[attribute]:
                 self.__dict__[attribute] = default
         return
-        
+
     def _equiv():
         if type(self) != type(other):
             return False
