@@ -14,7 +14,8 @@ from __future__ import absolute_import
 import json
 import logging
 import collections
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,12 @@ def object_to_json(obj, dict_class=dict):
 
     if isinstance(obj, (dict, dict_class)):
         return dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in obj.items()])
+
+    if isinstance(obj, time.struct_time):
+        obj = datetime.utcfromtimestamp(time.mktime(obj))
+
+    if isinstance(obj, date):
+        return obj.isoformat()
 
     if isinstance(obj, datetime):
         return obj.isoformat()
