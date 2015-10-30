@@ -44,13 +44,16 @@ def object_to_json(obj, dict_class=dict):
     if isinstance(obj, timedelta):
         return obj.total_seconds()
 
-    if hasattr(obj, 'to_json') and obj.to_json:
+    if hasattr(obj, 'to_json') and callable(obj.to_json):
         try:
             rep = obj.to_json(dict_class=dict_class)
         except TypeError:
             rep = obj.to_json()
         return rep
 
+    if hasattr(obj, 'to_dict') and callable(obj.to_dict):
+        return obj.to_dict()
+    
     if hasattr(obj, '__getstate__'):
         return object_to_json(obj.__getstate__())
 
@@ -261,19 +264,22 @@ class MetaObject(object):
     def _changed(self):
 
         def changed_key(k, v):
-            if k in self._required:
+            if k in self._reserved:
+                return False
+            elif k in self._required:
                 return True
             elif k in self._optional.keys():
                 if k in self._types.keys():
                     try:
-                        trial = (v == self._instantiate(self._types[k], k, self._optional[k]))
+                        default = self._instantiate(self._types[k], k, self._optional[k])
+                        trial = object_to_json(v) == object_to_json(default)
                     except:
                         trial = True
                     return not trial
                 else:
                     return not (v == self._optional[k])
             else:
-                return not (k in self._reserved)
+                return True
 
         return [k for k, v in self.__dict__.items() if changed_key(k, v)]
 
