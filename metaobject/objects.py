@@ -39,7 +39,12 @@ def object_to_json(obj, dict_class=dict):
         return map(lambda x: object_to_json(x, dict_class=dict_class), obj)
 
     if isinstance(obj, (dict, dict_class)):
-        return dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in obj.items()])
+        try:
+            obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in obj.items()])
+        except:
+            obj_repr = obj
+            logger.error("Unknown error serializing children of %s" % repr(obj_repr))
+        return obj_repr
 
     if isinstance(obj, time.struct_time):
         obj = datetime.utcfromtimestamp(time.mktime(obj))
