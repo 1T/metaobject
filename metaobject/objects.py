@@ -12,6 +12,7 @@ metaobject - A Meta-Object protocol library
 '''
 from __future__ import absolute_import
 import json
+import base64
 import logging
 import collections
 from datetime import date, datetime, timedelta
@@ -23,7 +24,15 @@ def object_to_json(obj, dict_class=dict):
     if obj is None:
         return None
 
-    if isinstance(obj, (bool, bytes, str, unicode, int, long, float)):
+    if isinstance(obj, (bytes, str)):
+        try:
+            obj_repr = obj.decode('utf8')
+            return obj_repr
+        except:
+            obj_repr = base64.b64encode(obj)
+            return "BASE64(" + str(obj_repr) + ")"
+
+    if isinstance(obj, (bool, unicode, int, long, float)):
         return obj
 
     if isinstance(obj, (list, tuple)):
@@ -53,7 +62,7 @@ def object_to_json(obj, dict_class=dict):
 
     if hasattr(obj, 'to_dict') and callable(obj.to_dict):
         return obj.to_dict()
-    
+
     if hasattr(obj, '__getstate__'):
         return object_to_json(obj.__getstate__())
 
