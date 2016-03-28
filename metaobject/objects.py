@@ -40,7 +40,22 @@ def object_to_json(obj, dict_class=dict):
 
     if isinstance(obj, (dict, dict_class)):
         try:
+            del obj['gelfProps']
+        except:
+            pass
+        try:
             obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in obj.items()])
+        except:
+            obj_repr = obj
+            logger.error("Unknown error serializing children of %s" % repr(obj_repr))
+        return obj_repr
+    else:
+        try:
+            del obj.gelfProps
+        except:
+            pass
+        try:
+            obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in vars(obj)])
         except:
             obj_repr = obj
             logger.error("Unknown error serializing children of %s" % repr(obj_repr))
@@ -75,7 +90,7 @@ def object_to_json(obj, dict_class=dict):
         return object_to_json(vars(obj))
 
     obj_repr = repr(obj).encode('ascii', 'ignore')
-    logger.error("Unknown error serializing %s" % obj_repr)
+    logger.info("Unknown error serializing %s" % obj_repr)
     return "ERROR(" + str(obj) + ")"
 
 class MetaObject(object):
