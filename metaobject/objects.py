@@ -38,29 +38,6 @@ def object_to_json(obj, dict_class=dict):
     if isinstance(obj, (list, tuple)):
         return map(lambda x: object_to_json(x, dict_class=dict_class), obj)
 
-    if isinstance(obj, (dict, dict_class)):
-        try:
-            del obj['gelfProps']
-        except:
-            pass
-        try:
-            obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in obj.items()])
-        except:
-            obj_repr = obj
-            logger.error("Unknown error serializing children of %s" % repr(obj_repr))
-        return obj_repr
-    else:
-        try:
-            del obj.gelfProps
-        except:
-            pass
-        try:
-            obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in vars(obj)])
-        except:
-            obj_repr = obj
-            logger.error("Unknown error serializing children of %s" % repr(obj_repr))
-        return obj_repr
-
     if isinstance(obj, time.struct_time):
         obj = datetime.utcfromtimestamp(time.mktime(obj))
 
@@ -79,6 +56,35 @@ def object_to_json(obj, dict_class=dict):
         except TypeError:
             rep = obj.to_json()
         return rep
+
+    if isinstance(obj, (dict, dict_class)):
+        try:
+            del obj['gelfProps']
+        except:
+            pass
+        try:
+            obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in obj.items()])
+        except:
+            obj_repr = obj
+            obj_repr = repr(obj_repr)
+            if len(obj_repr) > 500:
+                obj_repr = obj_repr[:500]
+            logger.error("Unknown error serializing keys of dict %s" % obj_repr)
+        return obj_repr
+    else:
+        try:
+            del obj.gelfProps
+        except:
+            pass
+        try:
+            obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in vars(obj)])
+        except:
+            obj_repr = obj
+            obj_repr = repr(obj_repr)
+            if len(obj_repr) > 500:
+                obj_repr = obj_repr[:500]
+            logger.error("Unknown error serializing attributes of object %s" % obj_repr)
+        return obj_repr
 
     if hasattr(obj, 'to_dict') and callable(obj.to_dict):
         return obj.to_dict()
