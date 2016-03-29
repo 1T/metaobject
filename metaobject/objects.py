@@ -50,6 +50,9 @@ def object_to_json(obj, dict_class=dict):
     if isinstance(obj, timedelta):
         return obj.total_seconds()
 
+    if type(obj).__name__ == 'SRE_Pattern':
+        return obj.pattern
+
     if hasattr(obj, 'to_json') and callable(obj.to_json):
         try:
             rep = obj.to_json(dict_class=dict_class)
@@ -77,7 +80,7 @@ def object_to_json(obj, dict_class=dict):
         except:
             pass
         try:
-            obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in vars(obj)])
+            obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in vars(obj) if k[0] != '_'])
         except:
             obj_repr = obj
             obj_repr = repr(obj_repr)
