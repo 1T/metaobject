@@ -3,7 +3,7 @@
 #
 # metaobject
 # Copyright (c) 2014, Andrew Robbins, All rights reserved.
-# 
+#
 # This library ("it") is free software; it is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; you can redistribute it and/or modify it under the terms of the
 # GNU Lesser General Public License ("LGPLv3") <https://www.gnu.org/licenses/lgpl.html>.
@@ -15,24 +15,27 @@ from __future__ import print_function
 
 import os.path
 
-def parse_commit(repopath):
-    from datetime import datetime
-
+def legacy_parse_commit(repopath):
+    import subprocess
     OLDPWD = os.getcwd()
     os.chdir(repopath)
+
+    git_cmd = "git log -n1 --decorate 2> /dev/null | tr '(,)' ';;;'"
+
     try:
-        import subprocess
-        git_cmd = "git log -n1 --decorate 2> /dev/null | tr '(,)' ';;;'"
-        commit = str(subprocess.check_output(git_cmd, shell=True))
+        commit = subprocess.check_output(git_cmd, shell=True)
     except (AttributeError, subprocess.CalledProcessError):
         commit = ''
-    os.chdir(OLDPWD)
-
     commit_magic, commit_token = ('', '')
-    if commit.count(' ') > 2:
-        commit_magic, commit_token, _ = commit.split(' ', 2)
-    version_tag = commit_token if commit_magic == 'commit' else 'UNKNOWN'
-    version = 'dev-' + version_tag
+    version_tag = 'UNKNOWN'
+    try:
+        if commit.count(' ') > 2:
+            commit_magic, commit_token, _ = commit.split(' ', 2)
+            version_tag = commit_token if commit_magic == 'commit' else 'UNKNOWN'
+    except:
+        pass
+    version_num = int(version_tag, 16)
+    version = '0.dev' + str(version_num)[-10:]
 
     # look for (tag: ...)
     try:
@@ -44,15 +47,17 @@ def parse_commit(repopath):
                 version_tag = commit[tag_start:tag_end]
                 if version_tag.startswith('v'):
                     version = version_tag[1:]
+                else:
+                    version = version_tag
     except:
         pass
 
     # look for (Date: ...)
+    date_line = 'UNKNOWN'
+    date_str = 'UNKNOWN'
+    time_str = 'UNKNOWN'
     try:
         date_lines = commit.split('\n')
-        date_line = 'UNKNOWN'
-        date_str = 'UNKNOWN'
-        time_str = 'UNKNOWN'
         for line in date_lines:
             if line.startswith('Date: '):
                 date_line = line
@@ -66,23 +71,50 @@ def parse_commit(repopath):
     except:
         pass
 
+    os.chdir(OLDPWD)
     return date_str, time_str, version, version_tag
 
+def parse_commit(repopath):
+    '''
+    Returns the version along with other stuff.
+    '''
+    from datetime import datetime
+
+    # First, try legacy v#.#.#
+    try:
+        d, t, version, version_tag = legacy_parse_commit(repopath)
+        if not version.startswith('dev'):
+            return d, t, version, version_tag
+    except Exception as err:
+        pass
+
+    # Second, try #.#.# using PBR
+    #if False:
+    #    import pbr.git
+    #    version = version_tag = '0.dev0'
+    #    changelog = pbr.git._iter_log_oneline('%s/.git' % repopath)
+    #    for _, tags, _ in changelog:
+    #        if tags:
+    #            version = version_tag = pbr.git._get_highest_tag(tags)
+    #            break
+    #    else:
+    #
+    #        # Third, try built-in pkg_resources
+    #        import pkg_resources
+    #        with open(os.path.join(repopath, 'package.json')) as reader:
+    #            name = json.loads(reader.read())['name']
+    #        dist = pkg_resources.get_distribution(name)
+    #        version = version_tag = dist._version
+
+    d, t = datetime.now().isoformat().split('T')
+    return d, t, version, version_tag
+
 __repo_path__ = os.path.realpath(os.path.dirname(os.path.dirname(__file__)))
-__title__ = os.path.basename(__repo_path__)
-(__date__, __time__, __version__, __version_tag__) = parse_commit(__repo_path__)
-__credits__ = u'Copyright \xa9 %s Andrew Robbins, All rights reserved.' % (__date__.split('-')[0])
-__homepage_url__ = 'https://github.com/andydude/%s/blob/%s/README.md' % (__title__, __version_tag__)
-__download_url__ = 'https://github.com/andydude/%s/archive/%s.zip' % (__title__, __version_tag__)
+(_, _, __version__, __version_tag__) = parse_commit(__repo_path__)
 
 if __name__ == '__main__':
-    print("credits:", __credits__)
-    print("datetime:", __date__, __time__)
-    print("title:", __title__)
     print("version:", __version__)
     print("version_tag:", __version_tag__)
-    print("download_url:", __download_url__)
-    print("url:", __homepage_url__)
 
 else:
     from .objects import MetaObject
