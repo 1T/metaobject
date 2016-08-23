@@ -12,6 +12,7 @@ metaobject - A Meta-Object protocol library
 '''
 from __future__ import absolute_import
 from setuptools import setup, find_packages
+import json
 import metaobject
 
 if __name__ == '__main__':
