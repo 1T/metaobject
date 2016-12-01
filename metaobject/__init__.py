@@ -81,6 +81,7 @@ def parse_commit(repopath):
     from datetime import datetime
 
     # First, try legacy v#.#.#
+    version, version_tag = '0', '0'
     try:
         d, t, version, version_tag = legacy_parse_commit(repopath)
         if not version.startswith('dev'):

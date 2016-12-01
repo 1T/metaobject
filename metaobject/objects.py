@@ -72,7 +72,7 @@ def object_to_json(obj, dict_class=dict):
             obj_repr = repr(obj_repr)
             if len(obj_repr) > 500:
                 obj_repr = obj_repr[:500]
-            logger.error("Unknown error serializing keys of dict %s" % obj_repr)
+            logger.error("Unknown error serializing keys of dict %s" % obj_repr, exc_info=True)
         return obj_repr
     else:
         try:
@@ -86,7 +86,7 @@ def object_to_json(obj, dict_class=dict):
             obj_repr = repr(obj_repr)
             if len(obj_repr) > 500:
                 obj_repr = obj_repr[:500]
-            logger.error("Unknown error serializing attributes of object %s" % obj_repr)
+            logger.error("Unknown error serializing attributes of object %s" % obj_repr, exc_info=True)
         return obj_repr
 
     if hasattr(obj, 'to_dict') and callable(obj.to_dict):
@@ -223,10 +223,12 @@ class MetaObject(object):
             else:
                 typed_value = cls(value) if value is not None else cls() # create a cls object
         except ValueError as err:
-            logger.error("MetaObject._instantiate(%s, %s, %s) %s" % (repr(cls), repr(attr), repr(value), repr(err)))
+            logger.error("MetaObject._instantiate(%s, %s, %s) %s" %
+                         (repr(cls), repr(attr), repr(value), repr(err)), exc_info=True)
             typed_value = cls(None)
         except Exception as err:
-            logger.error("MetaObject._instantiate(%s, %s, %s) %s" % (repr(cls), repr(attr), repr(value), repr(err)))
+            logger.error("MetaObject._instantiate(%s, %s, %s) %s" %
+                         (repr(cls), repr(attr), repr(value), repr(err)), exc_info=True)
             typed_value = None
         return typed_value
 
