@@ -17,6 +17,7 @@ import logging
 import collections
 from datetime import date, datetime, timedelta
 import time
+import six
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ def object_to_json(obj, dict_class=dict):
     if obj is None:
         return None
 
-    if isinstance(obj, (bytes, str)):
+    if isinstance(obj, six.binary_type):
         try:
             obj_repr = obj.decode('utf8')
             return obj_repr
@@ -32,7 +33,13 @@ def object_to_json(obj, dict_class=dict):
             obj_repr = base64.b64encode(obj)
             return "BASE64(" + str(obj_repr) + ")"
 
-    if isinstance(obj, (bool, unicode, int, long, float)):
+    if isinstance(obj, six.text_type):
+        return obj
+
+    if isinstance(obj, six.integer_types):
+        return obj
+
+    if isinstance(obj, (bool, float)):
         return obj
 
     if isinstance(obj, (list, tuple)):
@@ -207,7 +214,7 @@ class MetaObject(object):
     @staticmethod
     def _ununicode(kwargs):
         for key in kwargs.keys():
-            if isinstance(key, unicode):
+            if isinstance(key, six.text_type):
                 value = kwargs[key]
                 del kwargs[key]
                 key = str(key)
@@ -267,7 +274,7 @@ class MetaObject(object):
 
     def __repr__(self):
         d = dict(self.__dict__.items())
-        for key, _ in d.items():
+        for key, _ in list(d.items()):
             if key not in self._listed:
                 del d[key]
         s = '%s(%r)' % (self.__class__.__name__, d)
@@ -276,7 +283,7 @@ class MetaObject(object):
     def __str__(self):
         s = '<%s>' % self.__class__.__name__
         for _, value in self._printed_items():
-            if isinstance(value, unicode):
+            if isinstance(value, six.text_type):
                 value = value.replace(u'\xA0', u' ')
                 value = value.encode('latin1', 'ignore')
             s += ' %s' % str(value)
@@ -313,7 +320,8 @@ class MetaObject(object):
                     try:
                         default = self._instantiate(self._types[k], k, self._optional[k])
                         trial = object_to_json(v) == object_to_json(default)
-                    except:
+                    except Exception as err:
+                        print(repr(err))
                         trial = True
                     return not trial
                 else:
@@ -328,7 +336,7 @@ class MetaObject(object):
         # a list of unique fields which are a union
         # of required, optional, and typed fields
         listed = list(self._required)
-        addfields = set(self._optional.keys() + self._types.keys())
+        addfields = set(list(self._optional.keys()) + list(self._types.keys()))
         addfields -= set(self._required)
         listed += list(addfields)
         if len(self._mask):
@@ -345,14 +353,16 @@ class MetaObject(object):
     def to_json(self, dict_class=dict):
         try:
             rep = object_to_json(dict_class(self.items()), dict_class=dict_class)
-        except:
+        except Exception as err:
+            print(repr(err))
             rep = object_to_json(dict_class(self.items()))
         return rep
 
     def dumps(self, dict_class=dict, default=object_to_json):
         try:
             rep = self.to_json(dict_class=dict_class)
-        except:
+        except Exception as err:
+            print(repr(err))
             rep = self.to_json()
         return json.dumps(rep, default=default, **self._json_kw)
 
