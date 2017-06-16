@@ -14,6 +14,7 @@ from __future__ import absolute_import
 import json
 import base64
 import logging
+import types
 import collections
 from datetime import date, datetime, timedelta
 import time
@@ -42,8 +43,8 @@ def object_to_json(obj, dict_class=dict):
     if isinstance(obj, (bool, float)):
         return obj
 
-    if isinstance(obj, (list, tuple)):
-        return map(lambda x: object_to_json(x, dict_class=dict_class), obj)
+    if isinstance(obj, (list, tuple, collections.Sequence)):
+        return list(map(lambda x: object_to_json(x, dict_class=dict_class), obj))
 
     if isinstance(obj, time.struct_time):
         obj = datetime.utcfromtimestamp(time.mktime(obj))
@@ -67,7 +68,7 @@ def object_to_json(obj, dict_class=dict):
             rep = obj.to_json()
         return rep
 
-    if isinstance(obj, (dict, dict_class)):
+    if isinstance(obj, (dict, dict_class, collections.Mapping)):
         try:
             del obj['gelfProps']
         except:
@@ -225,8 +226,8 @@ class MetaObject(object):
     def _instantiate(cls, attr, value):
         try:
             typed_value = None
-            if isinstance(cls, (list, tuple)):
-                typed_value = map(cls[0], value) if value is not None else [] # create a list of cls objects
+            if isinstance(cls, list):
+                typed_value = list(map(cls[0], value)) if value is not None else [] # create a list of cls objects
             else:
                 typed_value = cls(value) if value is not None else cls() # create a cls object
         except ValueError as err:
