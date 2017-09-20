@@ -16,7 +16,6 @@ from __future__ import unicode_literals
 import json
 import base64
 import logging
-import types
 import collections
 from decimal import Decimal
 from datetime import date, datetime, timedelta
@@ -24,6 +23,7 @@ import time
 import six
 
 logger = logging.getLogger(__name__)
+
 
 def object_to_json(obj, dict_class=dict):
     if obj is None:
@@ -81,13 +81,16 @@ def object_to_json(obj, dict_class=dict):
         except:
             pass
         try:
-            obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in obj.items()])
+            obj_repr = dict_class([
+                (k, object_to_json(v, dict_class=dict_class))
+                for k, v in obj.items()])
         except:
             obj_repr = obj
             obj_repr = repr(obj_repr)
             if len(obj_repr) > 500:
                 obj_repr = obj_repr[:500]
-            logger.error("Unknown error serializing keys of dict %s" % obj_repr, exc_info=True)
+            logger.error("Unknown error serializing keys of dict %s" %
+                         obj_repr, exc_info=True)
         return obj_repr
     else:
         try:
@@ -95,13 +98,16 @@ def object_to_json(obj, dict_class=dict):
         except:
             pass
         try:
-            obj_repr = dict_class([(k, object_to_json(v, dict_class=dict_class)) for k, v in vars(obj) if k[0] != '_'])
+            obj_repr = dict_class([
+                (k, object_to_json(v, dict_class=dict_class))
+                for k, v in vars(obj) if k[0] != '_'])
         except:
             obj_repr = obj
             obj_repr = repr(obj_repr)
             if len(obj_repr) > 500:
                 obj_repr = obj_repr[:500]
-            logger.error("Unknown error serializing attributes of object %s" % obj_repr, exc_info=True)
+            logger.error("Unknown error serializing attributes of object %s" %
+                         obj_repr, exc_info=True)
         return obj_repr
 
     if hasattr(obj, 'to_dict') and callable(obj.to_dict):
@@ -116,6 +122,7 @@ def object_to_json(obj, dict_class=dict):
     obj_repr = repr(obj).encode('ascii', 'ignore')
     logger.info("Unknown error serializing %s" % obj_repr)
     return "ERROR(" + str(obj) + ")"
+
 
 class MetaObject(object):
 
@@ -142,16 +149,15 @@ class MetaObject(object):
                         #
                         # For example: attribute "age": int,
                         #    will set self.age = int(kwargs["age"])
-                        #
 
-    _unlisted_action = None # what do we do with an unlisted attribute: None, 'del', 'raise'
+    _unlisted_action = None  # what do we do with an unlisted attribute: None, 'del', 'raise'
 
     _integers = ()      # a list of attributes that are int type
 
     _mask = ()          # a list of attributes to be removed from _listed during output
 
     def __init__(self, obj=None):
-        if obj == None:
+        if obj is None:
             # default constructor
             kwargs = self._optional
         elif isinstance(obj, dict):
@@ -162,7 +168,8 @@ class MetaObject(object):
             kwargs = dict(vars(obj))
         else:
             logger.error("MetaObject.__init__(%s)" % (repr(obj)))
-            raise TypeError("expected dict or object: %s %s" % (type(obj), repr(obj)))
+            raise TypeError("expected dict or object: %s %s" %
+                            (type(obj), repr(obj)))
 
         # make sure that all keys are binary strings
         kwargs = self._ununicode(kwargs)
@@ -170,19 +177,22 @@ class MetaObject(object):
         # ensure that all required attributes are in given attributes
         for attr in self._required:
             if attr not in kwargs.keys():
-                raise AttributeError("missing attribute: %s from %s" % (attr, obj))
+                raise AttributeError("missing attribute: %s from %s" %
+                                     (attr, obj))
 
         # handle any attributes given that are neither required or optional
         if self._unlisted_action:
             for attr in kwargs.keys():
-                if not attr in self._listed:
+                if attr not in self._listed:
                     if self._unlisted_action == 'del':
                         del kwargs[attr]
                     elif self._unlisted_action == 'raise':
                         raise AttributeError("unlisted attribute: %s" % attr)
 
         self.__dict__.update(self._optional)
-        self.__dict__.update(kwargs)    # specific attributes override optional values
+
+        # specific attributes override optional values
+        self.__dict__.update(kwargs)
 
         # ensure that all int attributes are in _types
         if len(self._integers):
@@ -215,7 +225,8 @@ class MetaObject(object):
         self._printed = self._printed or self._required
 
         if len(self._mask):
-            self._printed = filter(lambda x: x not in self._mask, self._printed)
+            self._printed = filter(
+                lambda x: x not in self._mask, self._printed)
 
         return
 
@@ -234,21 +245,27 @@ class MetaObject(object):
         try:
             typed_value = None
             if isinstance(cls, list):
-                typed_value = list(map(cls[0], value)) if value is not None else [] # create a list of cls objects
+                # create a list of cls objects
+                typed_value = list(map(cls[0], value)) \
+                    if value is not None else []
             else:
-                typed_value = cls(value) if value is not None else cls() # create a cls object
+                # create a cls object
+                typed_value = cls(value) \
+                    if value is not None \
+                    else cls()
         except ValueError as err:
             logger.error("MetaObject._instantiate(%s, %s, %s) %s" %
-                         (repr(cls), repr(attr), repr(value), repr(err)), exc_info=True)
+                         (repr(cls), repr(attr),
+                          repr(value), repr(err)),
+                         exc_info=True)
             typed_value = cls(None)
         except Exception as err:
             logger.error("MetaObject._instantiate(%s, %s, %s) %s" %
-                         (repr(cls), repr(attr), repr(value), repr(err)), exc_info=True)
+                         (repr(cls), repr(attr),
+                          repr(value), repr(err)),
+                         exc_info=True)
             typed_value = None
         return typed_value
-
-    #def __iter__(self, obj=None):
-    #    return iter(self._listed)
 
     def __eq__(self, other):
         if type(self) != type(other):
@@ -265,20 +282,20 @@ class MetaObject(object):
 
     # backward compatibility
     def cleanOptionals(self):
-        #for all optionals that have a non-value assign default
-        for (attribute,default) in self._optional.items():
+        # for all optionals that have a non-value assign default
+        for (attribute, default) in self._optional.items():
             if not self.__dict__[attribute]:
                 self.__dict__[attribute] = default
         return
 
-    def _equiv():
+    def _equiv(self, other):
         if type(self) != type(other):
             return False
 
         return dict(self._listed_items()) == dict(other._listed_items())
 
-    def _not_equiv():
-        return not self.equiv(other)
+    def _not_equiv(self, other):
+        return not self._equiv(other)
 
     def __repr__(self):
         d = dict(self.__dict__.items())
@@ -353,14 +370,16 @@ class MetaObject(object):
 
     # The following methods are for use with JSON
     _json_kw = {
-        'indent': 4,          # The default for JSONEncoder is indent=None, the default for json.tool is indent=4
-        'separators': (',',   # The comma is usually at the end of a line
-                       ': '), # The colon is usually in the middle of a line
+        'indent': 4,           # The default for JSONEncoder is indent=None,
+                               # the default for json.tool is indent=4
+        'separators': (',',    # The comma is usually at the end of a line
+                       ': '),  # The colon is usually in the middle of a line
     }
 
     def to_json(self, dict_class=dict):
         try:
-            rep = object_to_json(dict_class(self.items()), dict_class=dict_class)
+            rep = object_to_json(dict_class(self.items()),
+                                 dict_class=dict_class)
         except Exception as err:
             print(repr(err))
             rep = object_to_json(dict_class(self.items()))
