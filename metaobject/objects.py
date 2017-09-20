@@ -2,20 +2,23 @@
 # -*- coding: utf-8 -*-
 #
 # metaobject
-# Copyright (c) 2014, Andrew Robbins, All rights reserved.
+# Copyright (c) 2014-2017, Andrew Robbins, All rights reserved.
 #
-# This library ("it") is free software; it is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; you can redistribute it and/or modify it under the terms of the
-# GNU Lesser General Public License ("LGPLv3") <https://www.gnu.org/licenses/lgpl.html>.
+# This library ("it") is free software; it is distributed in the hope that it
+# will be useful, but WITHOUT ANY WARRANTY; you can redistribute it and/or
+# modify it under the terms of LGPLv3 <https://www.gnu.org/licenses/lgpl.html>.
 '''
 metaobject - A Meta-Object protocol library
 '''
 from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
 import json
 import base64
 import logging
 import types
 import collections
+from decimal import Decimal
 from datetime import date, datetime, timedelta
 import time
 import six
@@ -43,8 +46,12 @@ def object_to_json(obj, dict_class=dict):
     if isinstance(obj, (bool, float)):
         return obj
 
+    if isinstance(obj, Decimal):
+        return float(obj)
+
     if isinstance(obj, (list, tuple, collections.Sequence)):
-        return list(map(lambda x: object_to_json(x, dict_class=dict_class), obj))
+        return list(map(lambda x: object_to_json(x, dict_class=dict_class),
+                        obj))
 
     if isinstance(obj, time.struct_time):
         obj = datetime.utcfromtimestamp(time.mktime(obj))
